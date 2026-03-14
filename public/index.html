@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Price Arbitrage — eBay × 国内 価格差ハンター</title>
+    <meta name="description" content="eBayと日本国内の価格差を調べて、アービトラージ（転売利益）が見込める商品を発見するツール">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ヘッダー -->
+    <header class="header">
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">💹</span>
+                <h1>Price Arbitrage</h1>
+                <span class="badge" id="modeBadge">DEMO</span>
+            </div>
+            <div class="header-info">
+                <span class="rate-display" id="rateDisplay">💱 1 USD = ¥---</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="main">
+        <!-- 検索セクション -->
+        <section class="search-section">
+            <div class="search-container">
+                <h2 class="search-title">eBay × 国内の価格差を発見</h2>
+                <p class="search-subtitle">日本で安く仕入れて、eBayで高く売れる商品を見つけよう</p>
+
+                <form class="search-form" id="searchForm">
+                    <div class="search-input-wrapper">
+                        <span class="search-icon">🔍</span>
+                        <input
+                            type="text"
+                            id="searchInput"
+                            class="search-input"
+                            placeholder="商品名を入力（例: MUJI aroma, one piece manga）"
+                            autocomplete="off"
+                        >
+                        <button type="submit" class="search-btn" id="searchBtn">
+                            <span class="btn-text">検索</span>
+                            <span class="btn-loader" style="display:none;">⏳</span>
+                        </button>
+                    </div>
+                </form>
+
+                <!-- プリセットボタン -->
+                <div class="presets" id="presets">
+                    <!-- JSで動的生成 -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ローディング -->
+        <div class="loading" id="loading" style="display:none;">
+            <div class="loading-spinner"></div>
+            <p class="loading-text">eBay + 楽天 を検索中…</p>
+        </div>
+
+        <!-- エラー表示 -->
+        <div class="error-banner" id="errorBanner" style="display:none;">
+            <span class="error-icon">⚠️</span>
+            <span class="error-text" id="errorText"></span>
+        </div>
+
+        <!-- 結果セクション -->
+        <section class="results-section" id="resultsSection" style="display:none;">
+
+            <!-- サマリーカード -->
+            <div class="summary-cards" id="summaryCards">
+                <!-- JSで動的生成 -->
+            </div>
+
+            <!-- eBay高額商品 -->
+            <div class="section-block">
+                <h3 class="section-title">
+                    <span class="section-icon">🏆</span>
+                    eBay 高額出品 TOP
+                </h3>
+                <div class="ebay-top-list" id="ebayTopList">
+                    <!-- JSで動的生成 -->
+                </div>
+            </div>
+
+            <!-- アービトラージ機会 -->
+            <div class="section-block">
+                <h3 class="section-title">
+                    <span class="section-icon">💰</span>
+                    利益が見込める商品（国内仕入れ → eBay販売）
+                </h3>
+                <div class="opportunities-list" id="opportunitiesList">
+                    <!-- JSで動的生成 -->
+                </div>
+            </div>
+
+        </section>
+
+        <!-- 初期表示: 説明 -->
+        <section class="intro-section" id="introSection">
+            <div class="intro-cards">
+                <div class="intro-card">
+                    <div class="intro-card-icon">🔍</div>
+                    <h3>1. キーワード検索</h3>
+                    <p>商品名やカテゴリで eBay（海外）と楽天（国内）を同時検索</p>
+                </div>
+                <div class="intro-card">
+                    <div class="intro-card-icon">📊</div>
+                    <h3>2. 価格差を自動計算</h3>
+                    <p>為替レート・eBay手数料(13%)・決済手数料(3%)・送料を差引いた純利益を算出</p>
+                </div>
+                <div class="intro-card">
+                    <div class="intro-card-icon">💰</div>
+                    <h3>3. 利益判定</h3>
+                    <p>利益が出そうな商品をランキング表示。ROI（投資利益率）で効率も一目瞭然</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- フッター -->
+    <footer class="footer">
+        <p>Price Arbitrage v1.0 — 為替レートは参考値です。実際の取引にはさらに詳細な調査が必要です。</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
