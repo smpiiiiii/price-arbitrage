@@ -647,11 +647,11 @@ function renderResults(data) {
 
     // 利益機会リスト
     const opportunities = data.opportunities || [];
-    // eBay検索用キーワード（英語）— 検索入力欄の値を使用
-    const ebaySearchKeyword = data.keyword || searchInput.value || 'japanese products';
     if (opportunities.length > 0) {
         opportunitiesList.innerHTML = opportunities.map(opp => {
             const isProfitable = opp.netProfit > 0;
+            // 各商品のタイトルからeBay検索用キーワードを生成
+            const itemEbayKeyword = extractEbayKeyword(opp.domesticTitle);
             return `
                 <div class="opportunity-card ${isProfitable ? 'profitable' : 'not-profitable'}">
                     <div class="opp-header">
@@ -688,10 +688,11 @@ function renderResults(data) {
                     </div>
                     </div>
                     <div class="opp-footer">
+                        <div class="opp-ebay-kw">🔎 eBay検索: <code>${escapeHtml(itemEbayKeyword)}</code></div>
                         <div class="opp-links">
                             ${opp.domesticUrl ? `<a class="opp-link buy-link" href="${escapeHtml(opp.domesticUrl)}" target="_blank" rel="noopener">🛒 楽天で購入 →</a>` : ''}
-                            <a class="opp-link sold-link" href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(ebaySearchKeyword)}&LH_Sold=1&LH_Complete=1&_sop=13" target="_blank" rel="noopener">✅ eBay落札実績 →</a>
-                            <a class="opp-link ebay-link" href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(ebaySearchKeyword)}&_sop=13" target="_blank" rel="noopener">🔍 eBay出品中 →</a>
+                            <a class="opp-link sold-link" href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(itemEbayKeyword)}&LH_Sold=1&LH_Complete=1&_sop=13" target="_blank" rel="noopener">✅ eBay落札実績 →</a>
+                            <a class="opp-link ebay-link" href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(itemEbayKeyword)}&_sop=13" target="_blank" rel="noopener">🔍 eBay出品中 →</a>
                         </div>
                         <div class="opp-hint">💡 落札実績で「いつ・いくらで売れたか」を確認 → 直近に高値で売れていれば仕入れ判断OK</div>
                     </div>
@@ -748,4 +749,76 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+// ============================================================
+//  eBayキーワード抽出
+// ============================================================
+
+// 日本語ブランド名→英語マッピング
+const BRAND_MAP = {
+    '無印良品': 'MUJI', '無印': 'MUJI',
+    'ユニクロ': 'UNIQLO',
+    'ソニー': 'SONY', 'パナソニック': 'Panasonic',
+    'ニコン': 'Nikon', 'キヤノン': 'Canon', 'キャノン': 'Canon',
+    'オリンパス': 'Olympus', 'フジフイルム': 'Fujifilm',
+    'トヨタ': 'Toyota', 'ホンダ': 'Honda',
+    'バンダイ': 'Bandai', 'タカラトミー': 'Takara Tomy',
+    '任天堂': 'Nintendo', 'セガ': 'SEGA', 'カプコン': 'Capcom',
+    'ポケモン': 'Pokemon', 'ポケットモンスター': 'Pokemon',
+    'ドラゴンボール': 'Dragon Ball', 'ワンピース': 'One Piece',
+    'ナルト': 'Naruto', '鬼滅の刃': 'Demon Slayer',
+    '進撃の巨人': 'Attack on Titan', '呪術廻戦': 'Jujutsu Kaisen',
+    'スタジオジブリ': 'Studio Ghibli', 'ジブリ': 'Ghibli',
+    'サンリオ': 'Sanrio', 'ハローキティ': 'Hello Kitty',
+    'カシオ': 'Casio', 'セイコー': 'Seiko', 'シチズン': 'Citizen',
+    'ダイソン': 'Dyson', 'レゴ': 'LEGO',
+    'アロマ': 'aroma', 'ディフューザー': 'diffuser',
+    'フィギュア': 'figure', '限定': 'limited edition',
+    'ぬいぐるみ': 'plush', 'ステーショナリー': 'stationery',
+    '文房具': 'stationery', '万年筆': 'fountain pen',
+    'ボールペン': 'ballpoint pen',
+    '陶器': 'pottery', '磁器': 'porcelain', '食器': 'tableware',
+    '急須': 'teapot', '茶碗': 'tea bowl', '湯呑': 'tea cup',
+    '着物': 'kimono', '浴衣': 'yukata',
+    '包丁': 'knife', '抹茶': 'matcha',
+};
+
+/**
+ * 楽天の日本語タイトルからeBay検索キーワードを抽出する
+ * @param {string} title - 楽天商品タイトル
+ * @returns {string} eBay検索用の英語キーワード
+ */
+function extractEbayKeyword(title) {
+    if (!title) return 'japanese product';
+
+    const parts = [];
+
+    // 1. 英字・数字の部分を抽出（ブランド名・型番など）
+    const englishParts = title.match(/[A-Za-z][A-Za-z0-9./-]{1,}/g) || [];
+    // ノイズワードを除外
+    const noiseWords = new Set(['cm', 'mm', 'ml', 'kg', 'px', 'the', 'and', 'for', 'with', 'http', 'https', 'www', 'jpg', 'png', 'html']);
+    for (const part of englishParts) {
+        if (!noiseWords.has(part.toLowerCase()) && part.length > 1) {
+            parts.push(part);
+        }
+    }
+
+    // 2. 日本語ブランド名を英語に変換
+    for (const [jp, en] of Object.entries(BRAND_MAP)) {
+        if (title.includes(jp) && !parts.some(p => p.toLowerCase() === en.toLowerCase())) {
+            parts.push(en);
+        }
+    }
+
+    // 3. 結果が空なら「japan」+カテゴリで検索
+    if (parts.length === 0) {
+        // タイトルの最初の数文字をそのまま使う（日本語でもeBayで検索可能）
+        const shortTitle = title.replace(/【.*?】/g, '').replace(/\[.*?\]/g, '').trim().substring(0, 30);
+        return `japan ${shortTitle}`;
+    }
+
+    // 重複除去して最大6語まで
+    const unique = [...new Set(parts)];
+    return unique.slice(0, 6).join(' ');
 }
