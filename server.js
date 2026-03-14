@@ -33,12 +33,23 @@ const PORT = parseInt(process.env.PORT) || 3000;
 const EBAY_CLIENT_ID = process.env.EBAY_CLIENT_ID || '';
 const EBAY_CLIENT_SECRET = process.env.EBAY_CLIENT_SECRET || '';
 const RAKUTEN_APP_ID = process.env.RAKUTEN_APP_ID || '';
+const RAKUTEN_ACCESS_KEY = process.env.RAKUTEN_ACCESS_KEY || '';
+const RAKUTEN_AFFILIATE_ID = process.env.RAKUTEN_AFFILIATE_ID || '';
 const FORCE_DEMO = process.env.DEMO_MODE === 'true';
 
-// モード判定
+// 各ソースの利用可否を個別判定
 const hasEbayApi = EBAY_CLIENT_ID && EBAY_CLIENT_ID !== 'your_ebay_client_id';
 const hasRakutenApi = RAKUTEN_APP_ID && RAKUTEN_APP_ID !== 'your_rakuten_app_id';
-const mode = FORCE_DEMO ? 'demo' : (hasEbayApi && hasRakutenApi) ? 'api' : 'scrape';
+
+// モード判定（表示用ラベル）
+// - api: eBay・楽天ともにAPI
+// - hybrid: 片方API + 片方スクレイプ
+// - scrape: 両方スクレイプ
+// - demo: デモデータ
+const mode = FORCE_DEMO ? 'demo'
+    : (hasEbayApi && hasRakutenApi) ? 'api'
+    : (hasEbayApi || hasRakutenApi) ? 'hybrid'
+    : 'scrape';
 
 // 静的ファイル配信
 app.use(express.static(join(__dirname, 'public')));
@@ -76,46 +87,52 @@ app.get('/api/search', async (req, res) => {
         }
 
         // ============================================================
-        //  APIモード or スクレイプモード
+        //  各ソース個別にAPI or スクレイプを選択
         // ============================================================
         let ebayItems = [];
         let rakutenItems = [];
         let ebaySource = '';
+        let rakutenSource = '';
 
-        if (mode === 'api') {
-            // 公式API使用
-            [ebayItems, rakutenItems] = await Promise.all([
-                searchEbay(ebayKeyword, {
-                    clientId: EBAY_CLIENT_ID,
-                    clientSecret: EBAY_CLIENT_SECRET,
-                    limit: 20,
-                }).catch(err => {
-                    console.error('⚠️ eBay API エラー:', err.message);
-                    return [];
-                }),
-                searchRakuten(rakutenKeyword, {
-                    appId: RAKUTEN_APP_ID,
-                    hits: 20,
-                }).catch(err => {
-                    console.error('⚠️ 楽天API エラー:', err.message);
-                    return [];
-                }),
-            ]);
-            ebaySource = 'api';
-        } else {
-            // HTTPスクレイプモード（APIキー不要）
-            [ebayItems, rakutenItems] = await Promise.all([
-                scrapeEbay(ebayKeyword, { sold: false }).catch(err => {
+        // eBay: APIキーがあればAPI、なければHTTPスクレイプ
+        const ebayPromise = hasEbayApi
+            ? searchEbay(ebayKeyword, {
+                clientId: EBAY_CLIENT_ID,
+                clientSecret: EBAY_CLIENT_SECRET,
+                limit: 20,
+            }).then(items => { ebaySource = 'api'; return items; })
+              .catch(err => {
+                console.error('⚠️ eBay API エラー:', err.message);
+                return [];
+            })
+            : scrapeEbay(ebayKeyword, { sold: false })
+                .then(items => { ebaySource = items.length > 0 ? 'scrape' : ''; return items; })
+                .catch(err => {
                     console.error('⚠️ eBay スクレイプエラー:', err.message);
                     return [];
-                }),
-                scrapeRakuten(rakutenKeyword).catch(err => {
+                });
+
+        // 楽天: APIキーがあればAPI、なければHTTPスクレイプ
+        const rakutenPromise = hasRakutenApi
+            ? searchRakuten(rakutenKeyword, {
+                appId: RAKUTEN_APP_ID,
+                accessKey: RAKUTEN_ACCESS_KEY,
+                affiliateId: RAKUTEN_AFFILIATE_ID,
+                referer: 'https://smpiiiiii.github.io/price-arbitrage/',
+                hits: 20,
+            }).then(items => { rakutenSource = 'api'; return items; })
+              .catch(err => {
+                console.error('⚠️ 楽天API エラー:', err.message);
+                return [];
+            })
+            : scrapeRakuten(rakutenKeyword)
+                .then(items => { rakutenSource = items.length > 0 ? 'scrape' : ''; return items; })
+                .catch(err => {
                     console.error('⚠️ 楽天スクレイプエラー:', err.message);
                     return [];
-                }),
-            ]);
-            ebaySource = ebayItems.length > 0 ? 'scrape' : '';
-        }
+                });
+
+        [ebayItems, rakutenItems] = await Promise.all([ebayPromise, rakutenPromise]);
 
         // eBayが取得できなかった場合 → 参考価格データを使用
         if (!ebayItems.length && rakutenItems.length > 0) {
@@ -131,7 +148,8 @@ app.get('/api/search', async (req, res) => {
                 searchedAt: new Date().toISOString(),
                 mode,
                 warning: 'eBay・楽天ともに検索結果が取得できませんでした。' +
-                    (mode === 'scrape' ? ' ボット検知の可能性があります。キーワードを変えてお試しください。' : ''),
+                    (!hasEbayApi ? ' eBay APIキーを設定すると安定して取得できます。' : '') +
+                    ' キーワードを変えてお試しください。',
                 ebayStats: { count: 0 },
                 ebayTopItems: [],
                 opportunities: [],
@@ -143,11 +161,17 @@ app.get('/api/search', async (req, res) => {
         result.keyword = keyword;
         result.mode = mode;
         result.ebaySource = ebaySource;
+
+        // データソース情報（フロントエンドでの表示用）
+        const sourceLabel = (type, count) => {
+            if (type === 'api') return `${count}件（API）`;
+            if (type === 'scrape') return `${count}件（スクレイプ）`;
+            if (type === 'reference') return `参考価格データ（${detectCategory(ebayKeyword).label}）`;
+            return '取得失敗';
+        };
         result.dataSources = {
-            ebay: ebaySource === 'reference'
-                ? `参考価格データ（${detectCategory(ebayKeyword).label}）`
-                : ebayItems.length > 0 ? `${ebayItems.length}件取得` : '取得失敗',
-            rakuten: rakutenItems.length > 0 ? `${rakutenItems.length}件（実データ）` : '取得失敗',
+            ebay: sourceLabel(ebaySource, ebayItems.length),
+            rakuten: sourceLabel(rakutenSource, rakutenItems.length),
         };
 
         res.json(result);
@@ -240,7 +264,11 @@ app.get('/api/status', (req, res) => {
         isDemoMode: mode === 'demo',
         hasEbayKey: hasEbayApi,
         hasRakutenKey: hasRakutenApi,
-        version: '1.1.0',
+        sources: {
+            ebay: hasEbayApi ? 'API' : 'スクレイプ',
+            rakuten: hasRakutenApi ? 'API' : 'スクレイプ',
+        },
+        version: '1.2.0',
     });
 });
 
@@ -249,7 +277,8 @@ app.get('/api/status', (req, res) => {
 // ============================================================
 
 const modeLabels = {
-    api: '🔑 APIモード（公式API使用）',
+    api: '🔑 APIモード（eBay + 楽天 公式API）',
+    hybrid: '🔀 ハイブリッドモード（API + スクレイプ混在）',
     scrape: '🌐 スクレイプモード（HTTPスクレイピング・APIキー不要）',
     demo: '🎭 デモモード（サンプルデータ）',
 };

@@ -9,6 +9,11 @@
 // アクセストークンキャッシュ
 let tokenCache = { token: '', expiresAt: 0 };
 
+/** トークンキャッシュを無効化する（401エラー時に使用） */
+function invalidateToken() {
+    tokenCache = { token: '', expiresAt: 0 };
+}
+
 /**
  * eBay OAuth2.0 アクセストークンを取得する
  * @param {string} clientId - eBayアプリのクライアントID
@@ -87,14 +92,27 @@ export async function searchEbay(keyword, options = {}) {
 
     console.log(`🔍 eBay API検索: "${keyword}"`);
 
-    const res = await fetch(url, {
+    let res = await fetch(url, {
         headers: {
             'Authorization': `Bearer ${token}`,
             'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-            'X-EBAY-C-ENDUSERCTX': 'affiliateCampaignId=<ePNCampaignId>,affiliateReferenceId=<referenceId>',
         },
         signal: AbortSignal.timeout(15000),
     });
+
+    // 401エラー時はトークンを再取得してリトライ
+    if (res.status === 401) {
+        console.log('🔄 eBay トークン期限切れ — 再取得中…');
+        invalidateToken();
+        const newToken = await getAccessToken(clientId, clientSecret);
+        res = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${newToken}`,
+                'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+            },
+            signal: AbortSignal.timeout(15000),
+        });
+    }
 
     if (!res.ok) {
         const errorText = await res.text();

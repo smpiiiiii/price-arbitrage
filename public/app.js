@@ -2,7 +2,25 @@
  * Price Arbitrage — フロントエンドアプリケーション
  *
  * 検索UI、API呼び出し、結果表示を管理する。
+ * サーバーAPIが利用可能な場合はサーバー経由、
+ * 利用不可の場合はフロントエンドから直接楽天APIを呼ぶ。
  */
+
+// ============================================================
+//  楽天API設定（フロントエンド直接呼び出し用）
+// ============================================================
+const RAKUTEN_CONFIG = {
+    appId: '4e0adb51-1f60-4d90-bc4e-208e0f6a538e',
+    accessKey: 'pk_WyrXzWk3S2eGqEE6QUWU1tonG0weFUwjrQcH575NPw8',
+    affiliateId: '51e3d606.edb6a336.51e3d607.848a4563',
+    apiBase: 'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601',
+};
+
+// 為替レートキャッシュ
+let cachedRates = { usdToJpy: 149.0 };
+
+// サーバーが利用可能かどうかのフラグ
+let serverAvailable = null;
 
 // ============================================================
 //  DOM要素の取得
@@ -29,6 +47,9 @@ const rateDisplay = $('rateDisplay');
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // サーバー利用可否を判定
+    await detectServer();
+
     // プリセット読み込み
     await loadPresets();
 
@@ -52,48 +73,137 @@ searchForm.addEventListener('submit', async (e) => {
 });
 
 // ============================================================
-//  API呼び出し
+//  サーバー検出
 // ============================================================
 
 /**
- * プリセット一覧を取得して表示する
+ * サーバーが利用可能か検出する
+ */
+async function detectServer() {
+    try {
+        const res = await fetch('/api/status', { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+            serverAvailable = true;
+            console.log('✅ サーバー検出: ローカルサーバーモード');
+        } else {
+            serverAvailable = false;
+        }
+    } catch {
+        serverAvailable = false;
+        console.log('📡 サーバー未検出: スタンドアロンモード（楽天API直接呼び出し）');
+    }
+}
+
+// ============================================================
+//  API呼び出し
+// ============================================================
+
+// プリセットデータ（サーバーなしでも使えるよう埋め込み）
+const PRESETS = [
+    {
+        label: '🏪 無印良品（MUJI）',
+        keyword: 'MUJI japan',
+        ebayKeyword: 'MUJI japan',
+        rakutenKeyword: '無印良品',
+        description: '無印良品の商品 — 海外で人気のアロマ・文具・生活雑貨',
+    },
+    {
+        label: '📚 マンガ初版',
+        keyword: 'manga first edition japanese',
+        ebayKeyword: 'manga first edition japanese',
+        rakutenKeyword: 'マンガ 初版',
+        description: '日本語マンガの初版本 — コレクター需要が高い',
+    },
+    {
+        label: '🎮 レトロゲーム',
+        keyword: 'retro game japan nintendo',
+        ebayKeyword: 'retro game japan nintendo',
+        rakutenKeyword: 'レトロゲーム ファミコン',
+        description: 'レトロゲームソフト — 海外コレクターに人気',
+    },
+    {
+        label: '📸 日本製カメラ',
+        keyword: 'japan camera vintage lens',
+        ebayKeyword: 'japan vintage camera lens nikon',
+        rakutenKeyword: 'ビンテージ カメラ レンズ',
+        description: 'ビンテージカメラ・レンズ — ニコン、キヤノン、オリンパス',
+    },
+    {
+        label: '🍵 日本製食器',
+        keyword: 'japanese pottery ceramic',
+        ebayKeyword: 'japanese pottery ceramic handmade',
+        rakutenKeyword: '和食器 陶器 手作り',
+        description: '和食器・陶器 — 手作り陶磁器の海外需要',
+    },
+    {
+        label: '🎌 アニメフィギュア',
+        keyword: 'anime figure japan',
+        ebayKeyword: 'anime figure japan limited',
+        rakutenKeyword: 'アニメ フィギュア 限定',
+        description: 'アニメフィギュア・限定グッズ',
+    },
+];
+
+/**
+ * プリセット一覧を表示する
  */
 async function loadPresets() {
-    try {
-        const res = await fetch('/api/presets');
-        const data = await res.json();
+    let presets = PRESETS;
 
-        presetsContainer.innerHTML = data.presets.map(preset =>
-            `<button class="preset-btn" data-keyword="${escapeHtml(preset.keyword)}" data-ebay="${escapeHtml(preset.ebayKeyword || preset.keyword)}" data-rakuten="${escapeHtml(preset.rakutenKeyword || preset.keyword)}" title="${escapeHtml(preset.description)}">
-                ${preset.label}
-            </button>`
-        ).join('');
-
-        // プリセットボタンのクリックイベント
-        presetsContainer.querySelectorAll('.preset-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const keyword = btn.dataset.keyword;
-                const ebayKw = btn.dataset.ebay;
-                const rakutenKw = btn.dataset.rakuten;
-                searchInput.value = keyword;
-                performSearch(keyword, ebayKw, rakutenKw);
-            });
-        });
-    } catch (err) {
-        console.error('プリセット読み込みエラー:', err);
+    // サーバーがあればサーバーから取得を試みる
+    if (serverAvailable) {
+        try {
+            const res = await fetch('/api/presets');
+            const data = await res.json();
+            presets = data.presets || PRESETS;
+        } catch {
+            // フォールバック: 埋め込みプリセットを使用
+        }
     }
+
+    presetsContainer.innerHTML = presets.map(preset =>
+        `<button class="preset-btn" data-keyword="${escapeHtml(preset.keyword)}" data-ebay="${escapeHtml(preset.ebayKeyword || preset.keyword)}" data-rakuten="${escapeHtml(preset.rakutenKeyword || preset.keyword)}" title="${escapeHtml(preset.description)}">
+            ${preset.label}
+        </button>`
+    ).join('');
+
+    // プリセットボタンのクリックイベント
+    presetsContainer.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const keyword = btn.dataset.keyword;
+            const ebayKw = btn.dataset.ebay;
+            const rakutenKw = btn.dataset.rakuten;
+            searchInput.value = keyword;
+            performSearch(keyword, ebayKw, rakutenKw);
+        });
+    });
 }
 
 /**
  * 為替レートを取得して表示する
  */
 async function loadRates() {
+    // まずサーバーから試みる
+    if (serverAvailable) {
+        try {
+            const res = await fetch('/api/rates');
+            const data = await res.json();
+            cachedRates = data;
+            rateDisplay.textContent = `💱 1 USD = ¥${data.usdToJpy.toFixed(1)}`;
+            return;
+        } catch {
+            // フォールバック
+        }
+    }
+
+    // フォールバック: 外部為替APIから取得
     try {
-        const res = await fetch('/api/rates');
+        const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
         const data = await res.json();
-        rateDisplay.textContent = `💱 1 USD = ¥${data.usdToJpy.toFixed(1)}`;
+        cachedRates.usdToJpy = data.rates?.JPY || 149.0;
+        rateDisplay.textContent = `💱 1 USD = ¥${cachedRates.usdToJpy.toFixed(1)}`;
     } catch {
-        // エラー時はデフォルト表示のまま
+        rateDisplay.textContent = `💱 1 USD = ¥${cachedRates.usdToJpy.toFixed(1)}（参考）`;
     }
 }
 
@@ -101,6 +211,12 @@ async function loadRates() {
  * サーバーステータスを取得してモードバッジを更新
  */
 async function loadStatus() {
+    if (!serverAvailable) {
+        modeBadge.textContent = 'STANDALONE';
+        modeBadge.className = 'badge live';
+        return;
+    }
+
     try {
         const res = await fetch('/api/status');
         const data = await res.json();
@@ -111,6 +227,9 @@ async function loadStatus() {
         } else if (data.mode === 'api') {
             modeBadge.textContent = 'API';
             modeBadge.className = 'badge live';
+        } else if (data.mode === 'hybrid') {
+            modeBadge.textContent = 'HYBRID';
+            modeBadge.className = 'badge live';
         } else {
             modeBadge.textContent = 'LIVE';
             modeBadge.className = 'badge live';
@@ -118,6 +237,264 @@ async function loadStatus() {
     } catch {
         // エラー時はデフォルト
     }
+}
+
+// ============================================================
+//  楽天API 直接呼び出し（ブラウザ専用）
+// ============================================================
+
+/**
+ * フロントエンドから直接楽天APIを呼ぶ
+ * @param {string} keyword - 検索キーワード
+ * @param {number} [hits=20] - 取得件数
+ * @returns {Promise<Array>} 検索結果
+ */
+async function searchRakutenDirect(keyword, hits = 20) {
+    const params = new URLSearchParams({
+        applicationId: RAKUTEN_CONFIG.appId,
+        accessKey: RAKUTEN_CONFIG.accessKey,
+        affiliateId: RAKUTEN_CONFIG.affiliateId,
+        keyword: keyword,
+        hits: String(Math.min(hits, 30)),
+        format: 'json',
+    });
+
+    const url = `${RAKUTEN_CONFIG.apiBase}?${params}`;
+    console.log(`🔍 楽天API直接呼び出し: "${keyword}"`);
+
+    const res = await fetch(url, {
+        signal: AbortSignal.timeout(10000),
+    });
+
+    if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`楽天API エラー (${res.status}): ${errorText}`);
+    }
+
+    const data = await res.json();
+    const items = data.Items || [];
+
+    console.log(`  → 楽天: ${items.length}件取得`);
+
+    return items.map(entry => {
+        const item = entry.Item || entry;
+        return {
+            title: item.itemName || '',
+            price: item.itemPrice || 0,
+            currency: 'JPY',
+            imageUrl: item.mediumImageUrls?.[0]?.imageUrl || item.smallImageUrls?.[0]?.imageUrl || '',
+            url: item.itemUrl || item.affiliateUrl || '',
+            shopName: item.shopName || '',
+            reviewCount: item.reviewCount || 0,
+            reviewAverage: item.reviewAverage || 0,
+        };
+    });
+}
+
+// ============================================================
+//  eBay参考価格データ（スタンドアロンモード用）
+// ============================================================
+
+const EBAY_REFERENCE = {
+    muji: {
+        label: 'MUJI Products', multiplier: 2.5,
+        keywords: ['muji', '無印良品', '無印'],
+        examples: [
+            { name: 'MUJI Aroma Diffuser', priceUsd: 32.50 },
+            { name: 'MUJI Gel Ink Pen Set', priceUsd: 29.99 },
+            { name: 'MUJI Essential Oil Set', priceUsd: 47.22 },
+            { name: 'MUJI Stationery Set', priceUsd: 35.00 },
+            { name: 'MUJI Skincare Product', priceUsd: 25.00 },
+        ],
+    },
+    manga: {
+        label: 'Manga First Editions', multiplier: 5.0,
+        keywords: ['manga', 'マンガ', '漫画', '初版', 'first edition', 'one piece', 'dragon ball'],
+        examples: [
+            { name: 'ONE PIECE Vol.1 1st Print', priceUsd: 2980.00 },
+            { name: 'NARUTO Vol.1 1st Print', priceUsd: 880.00 },
+            { name: 'DRAGON BALL Vol.1 1st Print', priceUsd: 500.00 },
+            { name: 'Generic Manga Volume', priceUsd: 25.00 },
+        ],
+    },
+    retrogame: {
+        label: 'Retro Games', multiplier: 3.0,
+        keywords: ['retro game', 'レトロゲーム', 'ファミコン', 'famicom', 'nintendo', 'snes'],
+        examples: [
+            { name: 'Super Famicom Console CIB', priceUsd: 150.00 },
+            { name: 'Famicom Game CIB', priceUsd: 45.00 },
+            { name: 'Game Boy Color Console', priceUsd: 80.00 },
+        ],
+    },
+    camera: {
+        label: 'Vintage Cameras', multiplier: 2.0,
+        keywords: ['camera', 'カメラ', 'lens', 'レンズ', 'nikon', 'canon', 'olympus'],
+        examples: [
+            { name: 'Nikon FM2 Body', priceUsd: 250.00 },
+            { name: 'Nikkor 50mm f/1.4', priceUsd: 180.00 },
+            { name: 'Canon AE-1 Program', priceUsd: 200.00 },
+        ],
+    },
+    pottery: {
+        label: 'Japanese Pottery', multiplier: 2.5,
+        keywords: ['pottery', '陶器', '食器', 'ceramic', '和食器'],
+        examples: [
+            { name: 'Hasami Ware Set', priceUsd: 60.00 },
+            { name: 'Arita Porcelain Plate', priceUsd: 45.00 },
+        ],
+    },
+    anime: {
+        label: 'Anime Figures', multiplier: 1.8,
+        keywords: ['anime', 'figure', 'フィギュア', 'アニメ', '限定'],
+        examples: [
+            { name: 'S.H.Figuarts Figure', priceUsd: 80.00 },
+            { name: 'Nendoroid Figure', priceUsd: 55.00 },
+            { name: 'Prize Figure', priceUsd: 30.00 },
+        ],
+    },
+    default: {
+        label: 'General Japanese Products', multiplier: 2.0,
+        keywords: [],
+        examples: [
+            { name: 'Japanese Product', priceUsd: 30.00 },
+        ],
+    },
+};
+
+/**
+ * キーワードからカテゴリを推定する
+ */
+function detectCategory(keyword) {
+    const lower = keyword.toLowerCase();
+    for (const [key, cat] of Object.entries(EBAY_REFERENCE)) {
+        if (key === 'default') continue;
+        if (cat.keywords.some(kw => lower.includes(kw.toLowerCase()))) return cat;
+    }
+    return EBAY_REFERENCE.default;
+}
+
+/**
+ * eBay参考アイテムを生成する
+ */
+function getEbayReferenceItems(keyword) {
+    const cat = detectCategory(keyword);
+    return cat.examples.map(ex => ({
+        title: ex.name,
+        price: ex.priceUsd,
+        currency: 'USD',
+        priceJpy: Math.round(ex.priceUsd * cachedRates.usdToJpy),
+        priceOriginal: `USD ${ex.priceUsd}`,
+        imageUrl: '',
+        url: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(ex.name)}`,
+        condition: '',
+        location: '',
+    }));
+}
+
+/**
+ * スタンドアロンモードで価格比較を実行する
+ * @param {string} keyword - 検索キーワード
+ * @param {string} ebayKw - eBay用キーワード
+ * @param {string} rakutenKw - 楽天用キーワード
+ * @returns {Promise<object>} 比較結果
+ */
+async function standaloneSearch(keyword, ebayKw, rakutenKw) {
+    // 楽天データ取得（フロントエンド直接）
+    let rakutenItems = [];
+    try {
+        rakutenItems = await searchRakutenDirect(rakutenKw || keyword);
+    } catch (err) {
+        console.error('楽天API エラー:', err.message);
+    }
+
+    // eBay参考データを使用
+    const ebayItems = getEbayReferenceItems(ebayKw || keyword);
+
+    if (!ebayItems.length && !rakutenItems.length) {
+        return {
+            keyword,
+            searchedAt: new Date().toISOString(),
+            mode: 'standalone',
+            warning: '検索結果が取得できませんでした。キーワードを変えてお試しください。',
+            ebayStats: { count: 0 },
+            ebayTopItems: [],
+            opportunities: [],
+            summary: { totalOpportunities: 0, profitableCount: 0, bestProfit: 0, avgProfit: 0 },
+        };
+    }
+
+    // 手数料定数
+    const EBAY_FEE_RATE = 0.13;
+    const PAYMENT_FEE_RATE = 0.03;
+    const SHIPPING_COST = 2000;
+
+    // eBay価格統計（JPY換算）
+    const ebayPricesJpy = ebayItems.map(i => i.priceJpy || Math.round(i.price * cachedRates.usdToJpy)).filter(p => p > 0).sort((a, b) => b - a);
+    const ebayStats = {
+        count: ebayPricesJpy.length,
+        max: ebayPricesJpy[0] || 0,
+        min: ebayPricesJpy[ebayPricesJpy.length - 1] || 0,
+        avg: ebayPricesJpy.length > 0 ? Math.round(ebayPricesJpy.reduce((a, b) => a + b, 0) / ebayPricesJpy.length) : 0,
+        median: ebayPricesJpy.length > 0 ? ebayPricesJpy[Math.floor(ebayPricesJpy.length / 2)] : 0,
+    };
+
+    // 利益計算
+    const opportunities = rakutenItems
+        .filter(item => item.price > 0)
+        .map(item => {
+            const buyPrice = item.price;
+            const sellPrice = ebayStats.median || ebayStats.avg;
+            const ebayFee = Math.round(sellPrice * EBAY_FEE_RATE);
+            const paymentFee = Math.round(sellPrice * PAYMENT_FEE_RATE);
+            const netProfit = sellPrice - buyPrice - ebayFee - paymentFee - SHIPPING_COST;
+            const roi = buyPrice > 0 ? Math.round(((sellPrice - buyPrice) / buyPrice) * 100) : 0;
+
+            return {
+                domesticTitle: item.title,
+                domesticPrice: buyPrice,
+                domesticUrl: item.url,
+                domesticImageUrl: item.imageUrl,
+                domesticShop: item.shopName,
+                ebayAvgPrice: ebayStats.avg,
+                ebayMedianPrice: ebayStats.median,
+                ebayListingCount: ebayStats.count,
+                estimatedSellPrice: sellPrice,
+                ebayFee,
+                paymentFee,
+                shippingCost: SHIPPING_COST,
+                netProfit,
+                roi,
+            };
+        })
+        .sort((a, b) => b.netProfit - a.netProfit);
+
+    // eBayトップ商品
+    const ebayTopItems = ebayItems
+        .map(item => ({ ...item, priceJpy: item.priceJpy || Math.round(item.price * cachedRates.usdToJpy) }))
+        .sort((a, b) => b.priceJpy - a.priceJpy)
+        .slice(0, 10);
+
+    return {
+        keyword,
+        searchedAt: new Date().toISOString(),
+        mode: 'standalone',
+        ebaySource: 'reference',
+        dataSources: {
+            ebay: `参考価格データ（${detectCategory(ebayKw || keyword).label}）`,
+            rakuten: `${rakutenItems.length}件（API直接）`,
+        },
+        ebayStats,
+        ebayTopItems,
+        opportunities,
+        summary: {
+            totalOpportunities: opportunities.length,
+            profitableCount: opportunities.filter(o => o.netProfit > 0).length,
+            bestProfit: opportunities.length > 0 ? opportunities[0].netProfit : 0,
+            avgProfit: opportunities.length > 0
+                ? Math.round(opportunities.reduce((a, b) => a + b.netProfit, 0) / opportunities.length)
+                : 0,
+        },
+    };
 }
 
 /**
@@ -135,18 +512,26 @@ async function performSearch(keyword, ebayKw = '', rakutenKw = '') {
     searchBtn.disabled = true;
 
     try {
-        let url = `/api/search?q=${encodeURIComponent(keyword)}`;
-        if (ebayKw) url += `&ebayKeyword=${encodeURIComponent(ebayKw)}`;
-        if (rakutenKw) url += `&rakutenKeyword=${encodeURIComponent(rakutenKw)}`;
+        let data;
 
-        const res = await fetch(url);
+        // サーバーが利用可能ならサーバー経由
+        if (serverAvailable) {
+            let url = `/api/search?q=${encodeURIComponent(keyword)}`;
+            if (ebayKw) url += `&ebayKeyword=${encodeURIComponent(ebayKw)}`;
+            if (rakutenKw) url += `&rakutenKeyword=${encodeURIComponent(rakutenKw)}`;
 
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            throw new Error(errData.error || `サーバーエラー (${res.status})`);
+            const res = await fetch(url);
+
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || `サーバーエラー (${res.status})`);
+            }
+
+            data = await res.json();
+        } else {
+            // スタンドアロンモード: フロントエンド直接
+            data = await standaloneSearch(keyword, ebayKw, rakutenKw);
         }
-
-        const data = await res.json();
 
         if (data.error) {
             showError(data.error);
@@ -155,6 +540,18 @@ async function performSearch(keyword, ebayKw = '', rakutenKw = '') {
 
         renderResults(data);
     } catch (err) {
+        // サーバーモードで失敗した場合、スタンドアロンにフォールバック
+        if (serverAvailable) {
+            console.warn('サーバーAPI失敗、スタンドアロンモードにフォールバック:', err.message);
+            try {
+                const data = await standaloneSearch(keyword, ebayKw, rakutenKw);
+                renderResults(data);
+                return;
+            } catch (fallbackErr) {
+                showError(fallbackErr.message);
+                return;
+            }
+        }
         showError(err.message);
     } finally {
         showLoading(false);
@@ -175,13 +572,26 @@ function renderResults(data) {
     let html = '';
     if (data.isDemo) {
         html += `<div class="demo-banner">🎭 デモモード — サンプルデータを表示しています。</div>`;
-    } else if (data.mode === 'scrape') {
-        const sources = data.dataSources ? `eBay: ${data.dataSources.ebay} / 楽天: ${data.dataSources.rakuten}` : '';
-        const bannerColor = data.ebaySource === 'reference'
-            ? 'background:rgba(139,92,246,0.12);color:#a78bfa;border-color:rgba(139,92,246,0.3);'
-            : 'background:rgba(16,185,129,0.12);color:#10b981;border-color:rgba(16,185,129,0.3);';
-        const icon = data.ebaySource === 'reference' ? '📊' : '🌐';
-        const label = data.ebaySource === 'reference' ? 'リアルデータ — 楽天（実データ）+ eBay（参考価格）' : 'リアルデータ — HTTPスクレイピングで取得';
+    } else {
+        const sources = data.dataSources
+            ? `eBay: ${data.dataSources.ebay} / 楽天: ${data.dataSources.rakuten}`
+            : '';
+
+        // eBayソースに応じてバナー色分け
+        let bannerColor, icon, label;
+        if (data.ebaySource === 'api') {
+            bannerColor = 'background:rgba(16,185,129,0.12);color:#10b981;border-color:rgba(16,185,129,0.3);';
+            icon = '🔑';
+            label = 'APIモード — eBay公式APIでリアルデータ取得';
+        } else if (data.ebaySource === 'scrape') {
+            bannerColor = 'background:rgba(16,185,129,0.12);color:#10b981;border-color:rgba(16,185,129,0.3);';
+            icon = '🌐';
+            label = 'リアルデータ — HTTPスクレイピングで取得';
+        } else {
+            bannerColor = 'background:rgba(139,92,246,0.12);color:#a78bfa;border-color:rgba(139,92,246,0.3);';
+            icon = '📊';
+            label = '推定データ — 楽天（実データ）+ eBay（参考価格）';
+        }
         html += `<div class="demo-banner" style="${bannerColor}">${icon} ${label} ${sources ? `(${sources})` : ''}</div>`;
     }
     if (data.warning) {
