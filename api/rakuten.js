@@ -53,10 +53,16 @@ export async function searchRakuten(keyword, options = {}) {
 
     console.log(`🔍 楽天API検索: "${keyword}"`);
 
-    // リクエストヘッダー（Referer必須）
-    const headers = {};
+    // リクエストヘッダー（Referer/Origin必須）
+    const headers = {
+        'User-Agent': 'PriceArbitrage/1.0',
+    };
     if (referer) {
         headers['Referer'] = referer;
+        // Originも設定（Node.jsのfetchではRefererが無視されることがある）
+        try {
+            headers['Origin'] = new URL(referer).origin;
+        } catch {}
     }
 
     const res = await fetch(url, {
