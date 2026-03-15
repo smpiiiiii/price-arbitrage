@@ -6,7 +6,11 @@
     "main": "server.js",
     "scripts": {
         "dev": "node server.js",
-        "start": "node server.js"
+        "start": "node server.js",
+        "monitor": "node price-monitor.js",
+        "monitor:once": "node price-monitor.js --once",
+        "snkrdunk": "node snkrdunk-monitor.js",
+        "snkrdunk:once": "node snkrdunk-monitor.js --once"
     },
     "dependencies": {
         "cheerio": "^1.2.0",
