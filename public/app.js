@@ -21,7 +21,7 @@ const RAKUTEN_CONFIG = {
 // ============================================================
 // デプロイ後にWorkerのURLを設定してください
 // 例: 'https://ebay-proxy.your-account.workers.dev'
-const EBAY_WORKER_URL = ''; // ← ここにWorker URLを設定
+const EBAY_WORKER_URL = 'https://ebay-proxy.shimpei-yokoyama0205.workers.dev';
 
 // Worker経由でリアルeBayデータを取得できるかのフラグ
 let ebayWorkerAvailable = false;

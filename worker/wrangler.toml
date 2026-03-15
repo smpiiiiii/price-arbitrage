@@ -1,0 +1,6 @@
+name = "ebay-proxy"
+main = "ebay-proxy.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+EBAY_ENV = "production"
