@@ -16,6 +16,16 @@ const RAKUTEN_CONFIG = {
     apiBase: 'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601',
 };
 
+// ============================================================
+//  eBay Cloudflare Worker プロキシ設定
+// ============================================================
+// デプロイ後にWorkerのURLを設定してください
+// 例: 'https://ebay-proxy.your-account.workers.dev'
+const EBAY_WORKER_URL = ''; // ← ここにWorker URLを設定
+
+// Worker経由でリアルeBayデータを取得できるかのフラグ
+let ebayWorkerAvailable = false;
+
 // 為替レートキャッシュ
 let cachedRates = { usdToJpy: 149.0 };
 
@@ -49,6 +59,9 @@ const rateDisplay = $('rateDisplay');
 document.addEventListener('DOMContentLoaded', async () => {
     // サーバー利用可否を判定
     await detectServer();
+
+    // eBay Worker検出
+    await detectEbayWorker();
 
     // プリセット読み込み
     await loadPresets();
@@ -292,7 +305,64 @@ async function searchRakutenDirect(keyword, hits = 20) {
 }
 
 // ============================================================
-//  eBay参考価格データ（スタンドアロンモード用）
+//  eBay Worker プロキシ呼び出し
+// ============================================================
+
+/**
+ * Cloudflare Worker経由でeBay Browse APIを検索する
+ * @param {string} keyword - 検索キーワード
+ * @param {number} [limit=20] - 取得件数
+ * @returns {Promise<Array>} 検索結果
+ */
+async function searchEbayViaWorker(keyword, limit = 20) {
+    if (!EBAY_WORKER_URL) throw new Error('Worker URL未設定');
+
+    const params = new URLSearchParams({ q: keyword, limit: String(limit) });
+    const url = `${EBAY_WORKER_URL}/search?${params}`;
+
+    console.log(`🔍 eBay Worker呼び出し: "${keyword}"`);
+
+    const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+
+    if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `eBay Worker エラー (${res.status})`);
+    }
+
+    const data = await res.json();
+    console.log(`  → eBay: ${data.count || 0}件取得（Worker経由）`);
+
+    return (data.items || []).map(item => ({
+        ...item,
+        priceJpy: Math.round((item.price || 0) * cachedRates.usdToJpy),
+        priceOriginal: `USD ${(item.price || 0).toFixed(2)}`,
+    }));
+}
+
+/**
+ * Worker起動チェック（初期化時に呼ぶ）
+ */
+async function detectEbayWorker() {
+    if (!EBAY_WORKER_URL) {
+        console.log('📊 eBay Worker URL未設定 → 参考価格データモード');
+        ebayWorkerAvailable = false;
+        return;
+    }
+    try {
+        const res = await fetch(`${EBAY_WORKER_URL}/status`, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) {
+            const data = await res.json();
+            ebayWorkerAvailable = data.hasEbayKeys === true;
+            console.log(`✅ eBay Worker検出: ${ebayWorkerAvailable ? 'APIキー設定済み' : 'APIキー未設定'}`);
+        }
+    } catch {
+        console.log('⚠️ eBay Worker接続失敗 → 参考価格データモード');
+        ebayWorkerAvailable = false;
+    }
+}
+
+// ============================================================
+//  eBay参考価格データ（スタンドアロンモード用・フォールバック）
 // ============================================================
 
 const EBAY_REFERENCE = {
@@ -407,8 +477,20 @@ async function standaloneSearch(keyword, ebayKw, rakutenKw) {
         console.error('楽天API エラー:', err.message);
     }
 
-    // eBay参考データを使用
-    const ebayItems = getEbayReferenceItems(ebayKw || keyword);
+    // eBayデータ取得: Worker → 参考データのフォールバック
+    let ebayItems = [];
+    let ebaySource = 'reference';
+    if (ebayWorkerAvailable) {
+        try {
+            ebayItems = await searchEbayViaWorker(ebayKw || keyword);
+            ebaySource = 'api';
+        } catch (err) {
+            console.warn('eBay Worker エラー、参考データにフォールバック:', err.message);
+            ebayItems = getEbayReferenceItems(ebayKw || keyword);
+        }
+    } else {
+        ebayItems = getEbayReferenceItems(ebayKw || keyword);
+    }
 
     if (!ebayItems.length && !rakutenItems.length) {
         return {
@@ -478,9 +560,11 @@ async function standaloneSearch(keyword, ebayKw, rakutenKw) {
         keyword,
         searchedAt: new Date().toISOString(),
         mode: 'standalone',
-        ebaySource: 'reference',
+        ebaySource: ebaySource,
         dataSources: {
-            ebay: `参考価格データ（${detectCategory(ebayKw || keyword).label}）`,
+            ebay: ebaySource === 'api'
+                ? `${ebayItems.length}件（eBay API）`
+                : `参考価格データ（${detectCategory(ebayKw || keyword).label}）`,
             rakuten: `${rakutenItems.length}件（API直接）`,
         },
         ebayStats,
