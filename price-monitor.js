@@ -481,6 +481,7 @@ async function sendDiscordNotification(result, label, ebayKeyword, soldData = {}
                 username: '💰 Price Alert v4',
                 avatar_url: 'https://cdn-icons-png.flaticon.com/512/2331/2331941.png',
                 embeds: [embed],
+                thread_name: '💰 eBayアービトラージ',
             }),
         });
 

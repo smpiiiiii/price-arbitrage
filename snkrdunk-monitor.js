@@ -500,6 +500,7 @@ async function sendDiscordAlert(product, priceData, sourceItem, profit, source, 
                 username: '👟 スニダンアラート v3',
                 avatar_url: 'https://cdn-icons-png.flaticon.com/512/2589/2589903.png',
                 embeds: [embed],
+                thread_name: '👟 スニダンアラート',
             }),
         });
         if (res.ok) {
