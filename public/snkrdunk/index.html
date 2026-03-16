@@ -3,131 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snkrdunk Monitor — スニダン × ヤフオク × メルカリ 価格差ハンター</title>
-    <meta name="description" content="スニーカーダンクの人気商品を楽天・Yahooショッピングと比較して、アービトラージ（転売利益）が見込める商品を発見するツール">
+    <title>Snkrdunk Arbitrage — スニダン × 楽天 × Yahoo 価格差ダッシュボード</title>
+    <meta name="description" content="スニーカーダンクの人気商品を楽天・Yahooショッピングと比較して、アービトラージ（転売利益）が見込める商品をリアルタイム表示">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- ヘッダー -->
-    <header class="header">
+    <header class="header" id="header">
         <div class="header-inner">
             <div class="logo">
                 <span class="logo-icon">👟</span>
-                <h1>Snkrdunk Monitor</h1>
-                <span class="badge live">LIVE</span>
+                <h1>Snkrdunk<span class="logo-accent">Arb</span></h1>
+                <span class="badge live" id="statusBadge">OFFLINE</span>
             </div>
-            <div class="header-info">
-                <span class="status-dot"></span>
-                <span class="rate-display" id="rateDisplay">スニダン × 楽天 × Yahoo × メルカリ</span>
+            <div class="header-right">
+                <div class="timer-pill" id="timerPill" title="次回スキャンまで">
+                    <span class="timer-icon">⏱</span>
+                    <span id="nextScanTimer">--:--</span>
+                </div>
+                <button class="refresh-btn" id="refreshBtn" title="今すぐ更新">🔄</button>
             </div>
         </div>
     </header>
 
-    <!-- メインコンテンツ -->
     <main class="main">
-        <!-- 検索セクション -->
-        <section class="search-section">
-            <div class="search-container">
-                <h2 class="search-title">スニダン × 国内の価格差を発見</h2>
-                <p class="search-subtitle">スニーカーダンクで高く売れて、楽天・Yahooで安く仕入れられる商品を自動検出</p>
-
-                <form class="search-form" id="searchForm">
-                    <div class="search-input-wrapper">
-                        <span class="search-icon">🔍</span>
-                        <input
-                            type="text"
-                            id="searchInput"
-                            class="search-input"
-                            placeholder="モデル番号や商品名（例: DZ4137-700, Air Jordan 1）"
-                            autocomplete="off"
-                        >
-                        <button type="submit" class="search-btn" id="searchBtn">
-                            <span class="btn-text">検索</span>
-                            <span class="btn-loader" style="display:none;">⏳</span>
-                        </button>
-                    </div>
-                </form>
-
-                <!-- プリセットボタン -->
-                <div class="presets" id="presets"></div>
-
-                <!-- 人気商品ワンクリック -->
-                <div class="quick-scan">
-                    <button class="scan-btn" id="scanPopularBtn">
-                        <span class="scan-icon">🚀</span>
-                        <span>人気商品30件をスキャン</span>
-                    </button>
+        <!-- ステータスバー -->
+        <section class="status-bar" id="statusBar">
+            <div class="status-bar-inner">
+                <div class="status-item">
+                    <span class="status-label">最終スキャン</span>
+                    <span class="status-value" id="lastScan">—</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">処理時間</span>
+                    <span class="status-value" id="elapsed">—</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">商品数</span>
+                    <span class="status-value" id="totalProducts">—</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Yahoo</span>
+                    <span class="status-value" id="totalYahoo">—</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">楽天</span>
+                    <span class="status-value" id="totalRakuten">—</span>
                 </div>
             </div>
         </section>
 
-        <!-- ローディング -->
-        <div class="loading" id="loading" style="display:none;">
-            <div class="loading-spinner"></div>
-            <p class="loading-text" id="loadingText">スニダン商品を取得中…</p>
-            <div class="loading-progress">
-                <div class="progress-bar" id="progressBar"></div>
+        <!-- サマリーカード -->
+        <section class="summary-section">
+            <div class="summary-grid">
+                <div class="summary-card card-alerts">
+                    <div class="card-glow"></div>
+                    <div class="card-icon">🔥</div>
+                    <div class="card-value" id="alertCount">0</div>
+                    <div class="card-label">アラート</div>
+                </div>
+                <div class="summary-card card-candidates">
+                    <div class="card-glow"></div>
+                    <div class="card-icon">🎯</div>
+                    <div class="card-value" id="candidateCount">0</div>
+                    <div class="card-label">候補商品</div>
+                </div>
+                <div class="summary-card card-profit">
+                    <div class="card-glow"></div>
+                    <div class="card-icon">💰</div>
+                    <div class="card-value" id="maxProfit">—</div>
+                    <div class="card-label">最大利益</div>
+                </div>
+                <div class="summary-card card-roi">
+                    <div class="card-glow"></div>
+                    <div class="card-icon">📊</div>
+                    <div class="card-value" id="maxRoi">—</div>
+                    <div class="card-label">最大ROI</div>
+                </div>
             </div>
-            <p class="loading-detail" id="loadingDetail"></p>
-        </div>
-
-        <!-- エラー表示 -->
-        <div class="error-banner" id="errorBanner" style="display:none;">
-            <span class="error-icon">⚠️</span>
-            <span class="error-text" id="errorText"></span>
-        </div>
-
-        <!-- 結果セクション -->
-        <section class="results-section" id="resultsSection" style="display:none;">
-
-            <!-- サマリーカード -->
-            <div class="summary-cards" id="summaryCards"></div>
-
-            <!-- アラート一覧 -->
-            <div class="section-block">
-                <h3 class="section-title">
-                    <span class="section-icon">🔥</span>
-                    利益が見込める商品
-                </h3>
-                <div class="alerts-list" id="alertsList"></div>
-            </div>
-
-            <!-- 全商品一覧 -->
-            <div class="section-block">
-                <h3 class="section-title">
-                    <span class="section-icon">👟</span>
-                    スキャン済み商品
-                </h3>
-                <div class="products-grid" id="productsGrid"></div>
-            </div>
-
         </section>
 
-        <!-- 初期表示: 説明 -->
-        <section class="intro-section" id="introSection">
-            <div class="intro-cards">
-                <div class="intro-card">
-                    <div class="intro-card-icon">👟</div>
-                    <h3>1. スニダンの相場を取得</h3>
-                    <p>スニーカーダンクの人気商品からサイズ別の販売価格を自動取得</p>
+        <!-- アラート一覧 -->
+        <section class="alerts-section" id="alertsSection">
+            <div class="section-header">
+                <h2><span class="section-icon">🔥</span> 利益アラート</h2>
+                <div class="section-badge" id="alertBadge">0件</div>
+            </div>
+            <div class="alerts-list" id="alertsList">
+                <div class="empty-state">
+                    <div class="empty-icon">📡</div>
+                    <div class="empty-text">モニター起動待ち…</div>
+                    <div class="empty-sub">サーバーでスキャンが完了すると結果が表示されます</div>
                 </div>
-                <div class="intro-card">
-                    <div class="intro-card-icon">🛍️</div>
-                    <h3>2. 仕入れ先を自動検索</h3>
-                    <p>楽天・Yahooショッピングで同じ商品を検索し、安い仕入れ先を発見</p>
-                </div>
-                <div class="intro-card">
-                    <div class="intro-card-icon">💰</div>
-                    <h3>3. 利益を自動計算</h3>
-                    <p>スニダン手数料(6.5%)・送料(¥990)を差し引いた純利益とROIを表示</p>
-                </div>
-                <div class="intro-card">
-                    <div class="intro-card-icon">📱</div>
-                    <h3>4. ワンタップ確認</h3>
-                    <p>メルカリ・ヤフオクの検索リンクでさらに安い仕入れ先をチェック</p>
+            </div>
+        </section>
+
+        <!-- 全商品一覧 -->
+        <section class="products-section" id="productsSection">
+            <div class="section-header">
+                <h2><span class="section-icon">👟</span> スキャン済み商品</h2>
+                <div class="section-badge" id="productBadge">0件</div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+                <div class="empty-state">
+                    <div class="empty-icon">👟</div>
+                    <div class="empty-text">商品データなし</div>
                 </div>
             </div>
         </section>
@@ -135,7 +118,7 @@
 
     <!-- フッター -->
     <footer class="footer">
-        <p>Snkrdunk Monitor v3.0 — スニダン × ヤフオク × メルカリ 統合アービトラージモニター</p>
+        <p>SnkrdunkArb v5.0 — 新品のみフィルタ対応 | 楽天 × Yahoo × メルカリ</p>
     </footer>
 
     <script src="app.js"></script>

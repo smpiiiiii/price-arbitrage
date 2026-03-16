@@ -22,6 +22,7 @@ import { getExchangeRates } from './api/exchange.js';
 import { compareProducts } from './lib/comparator.js';
 import { getEbayReferenceItems, detectCategory } from './lib/ebay-reference.js';
 import { getDemoData } from './demo/sample-data.js';
+import { readFileSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -268,8 +269,26 @@ app.get('/api/status', (req, res) => {
             ebay: hasEbayApi ? 'API' : 'スクレイプ',
             rakuten: hasRakutenApi ? 'API' : 'スクレイプ',
         },
-        version: '1.2.0',
+        version: '1.3.0',
     });
+});
+
+/**
+ * GET /api/snkrdunk-status
+ * スニダンモニターの最終スキャン結果を返す
+ */
+app.get('/api/snkrdunk-status', (req, res) => {
+    try {
+        const scanFile = join(__dirname, 'snkrdunk-last-scan.json');
+        if (existsSync(scanFile)) {
+            const data = JSON.parse(readFileSync(scanFile, 'utf-8'));
+            res.json({ status: 'ok', ...data });
+        } else {
+            res.json({ status: 'no_data', message: 'スキャンデータがまだありません。snkrdunk-monitor.jsを実行してください。' });
+        }
+    } catch (err) {
+        res.status(500).json({ status: 'error', error: err.message });
+    }
 });
 
 // ============================================================

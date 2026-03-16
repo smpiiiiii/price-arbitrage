@@ -8,6 +8,29 @@
 const RAKUTEN_API_BASE = 'https://openapi.rakuten.co.jp/ichibams/api/IchibaItem/Search/20220601';
 
 /**
+ * 中古品を示すキーワード一覧（タイトルに含まれていたら除外）
+ */
+const USED_KEYWORDS = [
+    '中古', 'ジャンク', '訳あり', 'わけあり', '難あり',
+    'リユース', 'セカンドハンド', '再生品', 'リファービッシュ',
+    '開封済み', '箱なし', '箱無し', 'used', 'pre-owned',
+    'refurbished', 'secondhand', 'second hand',
+    'B品', 'アウトレット品', '展示品', '返品',
+];
+
+/**
+ * 新品のみフィルタ — タイトルに中古関連キーワードが含まれる商品を除外
+ * @param {Array} items - 商品リスト
+ * @returns {Array} 新品のみの商品リスト
+ */
+function filterNewOnly(items) {
+    return items.filter(item => {
+        const title = (item.title || '').toLowerCase();
+        return !USED_KEYWORDS.some(kw => title.includes(kw.toLowerCase()));
+    });
+}
+
+/**
  * 楽天商品検索APIで商品を検索する
  * @param {string} keyword - 検索キーワード
  * @param {object} options - オプション
@@ -49,6 +72,11 @@ export async function searchRakuten(keyword, options = {}) {
         params.set('sort', sort);
     }
 
+    // 中古品を除外（新品のみ）
+    if (options.usedExcludeFlag) {
+        params.set('usedExcludeFlag', '1');
+    }
+
     const url = `${RAKUTEN_API_BASE}?${params}`;
 
     console.log(`🔍 楽天API検索: "${keyword}"`);
@@ -78,9 +106,7 @@ export async function searchRakuten(keyword, options = {}) {
     const data = await res.json();
     const items = data.Items || [];
 
-    console.log(`  → 楽天: ${items.length}件取得`);
-
-    return items.map(entry => {
+    const mapped = items.map(entry => {
         const item = entry.Item || entry;
         return {
             title: item.itemName || '',
@@ -95,4 +121,11 @@ export async function searchRakuten(keyword, options = {}) {
             availability: item.availability || 1,
         };
     });
+
+    // 中古品をタイトルベースで除外
+    const filtered = filterNewOnly(mapped);
+    const excluded = mapped.length - filtered.length;
+    console.log(`  → 楽天: ${mapped.length}件取得${excluded > 0 ? ` → 中古${excluded}件除外 → ${filtered.length}件` : ''}`);
+
+    return filtered;
 }

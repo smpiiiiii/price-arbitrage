@@ -21,6 +21,19 @@ import { searchRakuten } from './api/rakuten.js';
 import { getExchangeRates, toJpy } from './api/exchange.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 
+// ============================================================
+//  グローバルクラッシュハンドラ（プロセスが絶対に落ちないようにする）
+// ============================================================
+
+process.on('uncaughtException', (err) => {
+    console.error('🛡️ [uncaughtException] キャッチされなかった例外:', err.message);
+    console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('🛡️ [unhandledRejection] 未処理のPromise拒否:', reason);
+});
+
 
 // ============================================================
 //  設定
@@ -478,10 +491,9 @@ async function sendDiscordNotification(result, label, ebayKeyword, soldData = {}
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                username: '💰 Price Alert v4',
+                username: '💰 価格アラート（eBay）',
                 avatar_url: 'https://cdn-icons-png.flaticon.com/512/2331/2331941.png',
                 embeds: [embed],
-                thread_name: '💰 eBayアービトラージ',
             }),
         });
 
@@ -606,6 +618,7 @@ async function scanAll() {
                 affiliateId: RAKUTEN_AFFILIATE_ID,
                 referer: 'https://smpiiiiii.github.io/price-arbitrage/',
                 hits: 20,
+                usedExcludeFlag: true,
             });
             totalRakuten += rakutenItems.length;
             console.log(`  → 楽天: ${rakutenItems.length}件取得`);
@@ -717,7 +730,7 @@ async function sendStartupNotification() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                username: '💰 Price Alert v4',
+                username: '💰 価格アラート（eBay）',
                 avatar_url: 'https://cdn-icons-png.flaticon.com/512/2331/2331941.png',
                 embeds: [{
                     title: '🚀 価格モニター v4 起動（勝率向上版）',
@@ -749,14 +762,19 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 //  エントリポイント
 // ============================================================
 
+/** 連続エラーカウンタ */
+let consecutiveErrors = 0;
+const MAX_CONSECUTIVE_ERRORS = 5;
+
 async function main() {
-    console.log('💰 Price Arbitrage Monitor v4.0（勝率向上版）');
+    console.log('💰 Price Arbitrage Monitor v4.1（クラッシュ耐性強化版）');
     console.log(`   📡 eBay Browse API + Sold Listings × 楽天公式API`);
     console.log(`   通知条件: ROI ≧ ${THRESHOLD_ROI}% または 利益 ≧ ¥${THRESHOLD_PROFIT.toLocaleString()}`);
     console.log(`   ✅ 実売検証: Sold Listingsで実売価格を検証`);
     console.log(`   🚀 売れ行き: 月${MIN_MONTHLY_SALES}件以上の商品のみ`);
     console.log(`   👥 競合警告: ${COMPETITION_WARNING}件以上で注意`);
     console.log(`   📦 送料: カテゴリ別（¥1,500〜¥3,500）`);
+    console.log(`   🛡️ クラッシュ耐性: グローバルハンドラ + クールダウン`);
     console.log(`   監視: ${MONITOR_KEYWORDS.map(k => k.label).join(', ')}`);
     console.log(`   Discord: ${WEBHOOK_URL ? '✅' : '❌'}  LINE: ${LINE_NOTIFY_TOKEN ? '✅' : '❌（設定すればLINEにも通知）'}`);
     console.log('');
@@ -776,18 +794,35 @@ async function main() {
 
     if (isOnce) {
         console.log('📌 ワンショットモード（--once）');
-        await scanAll();
+        try {
+            await scanAll();
+        } catch (e) {
+            console.error(`❌ スキャンエラー: ${e.message}`);
+        }
     } else {
         await sendStartupNotification();
         console.log(`🔄 ${SCAN_INTERVAL_MS / 60000}分間隔で自動巡回開始\n`);
 
-        await scanAll();
+        try {
+            await scanAll();
+            consecutiveErrors = 0;
+        } catch (e) {
+            console.error(`❌ 初回スキャンエラー: ${e.message}`);
+            consecutiveErrors++;
+        }
 
         setInterval(async () => {
             try {
+                if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+                    console.log(`⏸️ 連続エラー ${consecutiveErrors}回 — クールダウン中...`);
+                    consecutiveErrors = 0;
+                    return;
+                }
                 await scanAll();
+                consecutiveErrors = 0;
             } catch (err) {
-                console.error(`❌ スキャンエラー: ${err.message}`);
+                consecutiveErrors++;
+                console.error(`❌ スキャンエラー (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}):`, err.message);
             }
         }, SCAN_INTERVAL_MS);
     }
@@ -795,5 +830,4 @@ async function main() {
 
 main().catch(err => {
     console.error('❌ 致命的エラー:', err);
-    process.exit(1);
 });

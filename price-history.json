@@ -1,0 +1,152 @@
+{
+  "🤖 ねんどろいど限定": [
+    {
+      "date": "2026-03-15T15:40:35.708Z",
+      "ebayMedian": 19018,
+      "rakutenMin": 200
+    },
+    {
+      "date": "2026-03-15T16:00:39.237Z",
+      "ebayMedian": 19018,
+      "rakutenMin": 200
+    },
+    {
+      "date": "2026-03-15T16:03:13.005Z",
+      "ebayMedian": 19018,
+      "rakutenMin": 200
+    }
+  ],
+  "🎭 figma": [
+    {
+      "date": "2026-03-15T15:40:39.453Z",
+      "ebayMedian": 20930,
+      "rakutenMin": 2900
+    },
+    {
+      "date": "2026-03-15T16:00:52.569Z",
+      "ebayMedian": 20930,
+      "rakutenMin": 2900
+    },
+    {
+      "date": "2026-03-15T16:03:48.557Z",
+      "ebayMedian": 21652,
+      "rakutenMin": 2900
+    }
+  ],
+  "🔧 ガンプラ MG": [
+    {
+      "date": "2026-03-15T15:40:43.497Z",
+      "ebayMedian": 9233,
+      "rakutenMin": 3300
+    },
+    {
+      "date": "2026-03-15T16:01:06.603Z",
+      "ebayMedian": 9233,
+      "rakutenMin": 3300
+    },
+    {
+      "date": "2026-03-15T16:04:13.394Z",
+      "ebayMedian": 9233,
+      "rakutenMin": 3300
+    }
+  ],
+  "🔧 ガンプラ HG": [
+    {
+      "date": "2026-03-15T15:40:47.846Z",
+      "ebayMedian": 4265,
+      "rakutenMin": 949
+    },
+    {
+      "date": "2026-03-15T16:01:10.503Z",
+      "ebayMedian": 4265,
+      "rakutenMin": 949
+    },
+    {
+      "date": "2026-03-15T16:04:17.498Z",
+      "ebayMedian": 4265,
+      "rakutenMin": 949
+    }
+  ],
+  "⚔️ METAL BUILD": [
+    {
+      "date": "2026-03-15T15:40:51.609Z",
+      "ebayMedian": 49761,
+      "rakutenMin": 19480
+    },
+    {
+      "date": "2026-03-15T16:01:14.363Z",
+      "ebayMedian": 49761,
+      "rakutenMin": 19480
+    },
+    {
+      "date": "2026-03-15T16:04:21.267Z",
+      "ebayMedian": 49761,
+      "rakutenMin": 19480
+    }
+  ],
+  "🏪 無印良品": [
+    {
+      "date": "2026-03-15T15:40:55.436Z",
+      "ebayMedian": 3190,
+      "rakutenMin": 990
+    },
+    {
+      "date": "2026-03-15T16:01:27.187Z",
+      "ebayMedian": 3190,
+      "rakutenMin": 990
+    },
+    {
+      "date": "2026-03-15T16:04:39.184Z",
+      "ebayMedian": 3190,
+      "rakutenMin": 990
+    }
+  ],
+  "🥃 ウイスキーグラス": [
+    {
+      "date": "2026-03-15T16:01:30.969Z",
+      "ebayMedian": 8027,
+      "rakutenMin": 352
+    },
+    {
+      "date": "2026-03-15T16:04:42.999Z",
+      "ebayMedian": 8027,
+      "rakutenMin": 352
+    }
+  ],
+  "🔪 日本製包丁": [
+    {
+      "date": "2026-03-15T16:01:42.922Z",
+      "ebayMedian": 11005,
+      "rakutenMin": 2980
+    },
+    {
+      "date": "2026-03-15T16:05:01.541Z",
+      "ebayMedian": 11005,
+      "rakutenMin": 2980
+    }
+  ],
+  "🎮 レトロゲーム": [
+    {
+      "date": "2026-03-15T16:01:46.732Z",
+      "ebayMedian": 9057,
+      "rakutenMin": 700
+    },
+    {
+      "date": "2026-03-15T16:05:05.297Z",
+      "ebayMedian": 9057,
+      "rakutenMin": 700
+    }
+  ],
+  "🤖 アニメフィギュア": [
+    {
+      "date": "2026-03-15T16:01:59.231Z",
+      "ebayMedian": 17536,
+      "rakutenMin": 1200
+    },
+    {
+      "date": "2026-03-15T16:05:22.673Z",
+      "ebayMedian": 17536,
+      "rakutenMin": 1200
+    }
+  ]
+}

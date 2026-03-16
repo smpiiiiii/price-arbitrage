@@ -12,13 +12,16 @@ import * as cheerio from 'cheerio';
  * @param {string} keyword - 検索キーワード
  * @param {object} [options] - オプション
  * @param {number} [options.page=1] - ページ番号
+ * @param {string} [options.sort='new'] - ソート順 ('new'=新着順, 'standard'=標準)
  * @returns {Promise<Array>}
  */
 export async function scrapeRakuten(keyword, options = {}) {
-    const { page = 1 } = options;
+    const { page = 1, sort = 'new' } = options;
 
     const encodedKeyword = encodeURIComponent(keyword);
-    const url = `https://search.rakuten.co.jp/search/mall/${encodedKeyword}/?p=${page}`;
+    // s=2: 新着順ソート（最近出品された商品を優先取得）
+    const sortParam = sort === 'new' ? '&s=2' : '';
+    const url = `https://search.rakuten.co.jp/search/mall/${encodedKeyword}/?p=${page}${sortParam}`;
 
     console.log(`🌐 楽天 HTTP検索: "${keyword}"`);
 
